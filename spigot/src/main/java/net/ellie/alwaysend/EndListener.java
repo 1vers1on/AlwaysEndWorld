@@ -1,15 +1,20 @@
 package net.ellie.alwaysend;
 
 import org.bukkit.World;
+import org.bukkit.entity.EnderCrystal;
+import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.world.PortalCreateEvent;
 
 public class EndListener implements Listener {
 
@@ -47,6 +52,26 @@ public class EndListener implements Listener {
     public void onRespawn(PlayerRespawnEvent event) {
         var loc = endWorld.getPlayerLocation(event.getPlayer());
         if (loc != null) event.setRespawnLocation(loc);
+    }
+
+    /**
+     * Stop the dragon fight at the source. The fight's dragon does not reliably fire
+     * CreatureSpawnEvent, so cancel the broader EntitySpawnEvent for the dragon and its crystals.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEntitySpawn(EntitySpawnEvent event) {
+        World end = endWorld.getWorld();
+        if (end == null || !event.getEntity().getWorld().equals(end)) return;
+        Entity entity = event.getEntity();
+        if (entity instanceof EnderDragon || entity instanceof EnderCrystal) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPortalCreate(PortalCreateEvent event) {
+        if (!event.getWorld().equals(endWorld.getWorld())) return;
+        event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

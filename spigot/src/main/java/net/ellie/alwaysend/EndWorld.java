@@ -7,6 +7,8 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.boss.DragonBattle;
+import org.bukkit.entity.EnderCrystal;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
@@ -34,7 +36,7 @@ public class EndWorld {
 
         World existing = Bukkit.getWorld(name);
         if (existing != null) {
-            applyDragonBossBar(existing);
+            configure(existing);
             return existing;
         }
 
@@ -50,11 +52,24 @@ public class EndWorld {
 
         applyGameRules(w);
         w.setAutoSave(false);
-        w.setSpawnLocation(0, 100, 0);
-        applyDragonBossBar(w);
+        configure(w);
 
         plugin.getLogger().info("Void end world '" + name + "' created.");
         return w;
+    }
+
+    /** Settings that must be (re)applied whether the world is freshly created or loaded from disk. */
+    private void configure(World w) {
+        // Put the world spawn well away from the dragon-fight structures at the origin (0,0).
+        w.setSpawnLocation(playerSpacing, 100, 0);
+        // Don't pin the origin chunks in memory. If (0,0) never loads, the vanilla dragon
+        // fight there never ticks — so no dragon, no boss bar, no portal/pillars get placed.
+        try {
+            w.setGameRule(GameRule.SPAWN_CHUNK_RADIUS, 0);
+        } catch (Throwable ignored) {
+            w.setKeepSpawnInMemory(false);
+        }
+        neutralizeDragonFight(w);
     }
 
     private void applyGameRules(World w) {
@@ -66,10 +81,56 @@ public class EndWorld {
         w.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, plugin.getConfig().getBoolean("game-rules.immediate-respawn", true));
     }
 
-    private void applyDragonBossBar(World w) {
+    /** Public entry point for the repeating safety-net task. */
+    public void neutralizeDragonFight() {
+        neutralizeDragonFight(world);
+    }
+
+    /**
+     * Shuts down every part of the vanilla End dragon fight: marks it finished so nothing
+     * respawns, hides/clears the boss bar, removes the dragon and its crystals, and clears
+     * the portal structures at the origin if those chunks happen to be loaded.
+     */
+    private void neutralizeDragonFight(World w) {
+        if (w == null) return;
+
         DragonBattle battle = w.getEnderDragonBattle();
         if (battle != null) {
-            battle.getBossBar().setVisible(plugin.getConfig().getBoolean("dragon-boss-bar", false));
+            // Tell the fight the dragon is already dead so it never (re)spawns it.
+            try {
+                battle.setPreviouslyKilled(true);
+            } catch (Throwable ignored) {
+                // API not present on this server — the spawn cancel + removals below still cover us.
+            }
+            if (!plugin.getConfig().getBoolean("dragon-boss-bar", false)) {
+                battle.getBossBar().setVisible(false);
+                battle.getBossBar().removeAll();
+            }
+            EnderDragon current = battle.getEnderDragon();
+            if (current != null) current.remove();
+        }
+
+        // Catch anything that spawned before the plugin loaded or slipped through.
+        for (EnderDragon dragon : w.getEntitiesByClass(EnderDragon.class)) dragon.remove();
+        for (EnderCrystal crystal : w.getEntitiesByClass(EnderCrystal.class)) crystal.remove();
+
+        // The fight only places blocks once the origin chunk is loaded; clear them when it is.
+        if (w.isChunkLoaded(0, 0)) removeFightStructures(w);
+    }
+
+    /** Clears the exit-portal fountain and central bedrock the fight builds around (0, ~60-78, 0). */
+    private void removeFightStructures(World w) {
+        for (int x = -6; x <= 6; x++) {
+            for (int z = -6; z <= 6; z++) {
+                for (int y = 55; y <= 78; y++) {
+                    var block = w.getBlockAt(x, y, z);
+                    switch (block.getType()) {
+                        case END_PORTAL, BEDROCK, DRAGON_EGG, OBSIDIAN, IRON_BARS, END_STONE ->
+                            block.setType(Material.AIR, false);
+                        default -> { }
+                    }
+                }
+            }
         }
     }
 
@@ -115,7 +176,8 @@ public class EndWorld {
     }
 
     private Location slotToLocation(int slot) {
-        return new Location(world, (double) slot * playerSpacing, 100.0, 0.5, 0f, 0f);
+        // +1 so slot 0 is never at the origin (0,0), where the dragon-fight structures live.
+        return new Location(world, (double) (slot + 1) * playerSpacing, 100.0, 0.5, 0f, 0f);
     }
 
     public World getWorld() {
