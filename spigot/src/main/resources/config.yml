@@ -1,0 +1,19 @@
+world:
+  # Name of the void end world to create/load
+  name: alwaysend
+  # Distance (in blocks) between each player's isolated spawn point
+  player-spacing: 10000
+
+# Lock players to their assigned location (prevents all movement)
+lock-movement: false
+
+# Whether to show the ender dragon boss bar
+dragon-boss-bar: false
+
+game-rules:
+  daylight-cycle: false
+  weather-cycle: false
+  mob-spawning: false
+  fire-tick: false
+  announce-advancements: false
+  immediate-respawn: true

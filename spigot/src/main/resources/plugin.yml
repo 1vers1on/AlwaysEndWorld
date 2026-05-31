@@ -1,0 +1,18 @@
+name: AlwaysEnd
+version: "${version}"
+main: net.ellie.alwaysend.AlwaysEndPlugin
+api-version: "1.21"
+description: Forces players into an isolated void End world on join
+authors:
+  - Ellie
+
+commands:
+  alwaysend:
+    description: AlwaysEnd admin commands
+    usage: /alwaysend reload
+    permission: alwaysend.admin
+
+permissions:
+  alwaysend.admin:
+    description: Allows use of /alwaysend commands
+    default: op
