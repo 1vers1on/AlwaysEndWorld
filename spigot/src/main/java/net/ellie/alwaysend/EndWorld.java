@@ -3,6 +3,7 @@ package net.ellie.alwaysend;
 import org.bukkit.Bukkit;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.boss.DragonBattle;
@@ -82,6 +83,7 @@ public class EndWorld {
             slot = nextSlot++;
         }
         playerSlots.put(player.getUniqueId(), slot);
+        placeBarrier(slot);
         return slotToLocation(slot);
     }
 
@@ -94,7 +96,22 @@ public class EndWorld {
 
     public void releasePlayer(Player player) {
         Integer slot = playerSlots.remove(player.getUniqueId());
-        if (slot != null) freeSlots.add(slot);
+        if (slot != null) {
+            removeBarrier(slot);
+            freeSlots.add(slot);
+        }
+    }
+
+    private void placeBarrier(int slot) {
+        if (world == null) return;
+        Location loc = slotToLocation(slot);
+        world.getBlockAt(loc.getBlockX(), loc.getBlockY() - 1, loc.getBlockZ()).setType(Material.BARRIER);
+    }
+
+    private void removeBarrier(int slot) {
+        if (world == null) return;
+        Location loc = slotToLocation(slot);
+        world.getBlockAt(loc.getBlockX(), loc.getBlockY() - 1, loc.getBlockZ()).setType(Material.AIR);
     }
 
     private Location slotToLocation(int slot) {
